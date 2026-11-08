@@ -163,6 +163,15 @@ export function nearby(L, lon, lat) {
   }
 }
 
+// Score of any parcel without reading tiles: fast enough to compare two parcels on the spot
+export async function quickScore(cell) {
+  const L = await loadTerrain()
+  const lon = (cell.w + cell.e) / 2, lat = (cell.n + cell.s) / 2
+  const t = nearby(L, lon, lat)
+  const score = scoreOf(t)
+  return { number: cell.number, total: score.total, rank: rankOf(score.total, L.scoreDist), town: t.town?.name ?? null }
+}
+
 export async function describe(cell, obelisco) {
   const L = await loadTerrain()
   const lon = (cell.w + cell.e) / 2, lat = (cell.n + cell.s) / 2

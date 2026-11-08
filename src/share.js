@@ -274,6 +274,6 @@ export function shareText(info, meta) {
   const url = `${location.origin}${location.pathname}#parcela=${info.cell.number}`
   return {
     url,
-    text: `Si repartiéramos la tierra argentina en partes iguales, me tocarían ${fmt(meta.area_m2 / 1e4, 1)} hectáreas ${where}.${rank} ¿Y a vos qué te toca? ${url}`,
+    text: `Si repartiéramos la tierra argentina en partes iguales, me tocarían ${fmt(meta.area_m2 / 1e4, 1)} hectáreas ${where}.${rank} ¿Y a vos qué te toca? Entrá y comparemos: ${url}`,
   }
 }

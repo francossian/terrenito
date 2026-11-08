@@ -233,3 +233,24 @@ dl.near dd { display: flex; gap: 8px; justify-content: space-between; }
   border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08); color: var(--ink); }
 .m-foot .primary { border: 0; background: var(--accent); color: var(--accentInk); }
 .app.mobile .maplibregl-ctrl-bottom-left { bottom: env(safe-area-inset-bottom); }
+
+/* ---- Comparisons ------------------------------------------------------------------------ */
+.invite { margin: 4px 0 12px; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+.invite p { margin: 0 0 10px; font-weight: 600; }
+.invite .primary { width: 100%; }
+.versus { margin: 10px 0 6px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line); }
+.verdict-line { margin: 0 0 10px; font-size: 18px; font-weight: 800; color: var(--accent); }
+.vs-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+.vs-row i { color: var(--ink-2); font-style: normal; font-size: 13px; }
+.vs-side { display: grid; gap: 2px; }
+.vs-side span { font-size: 12px; color: var(--ink-2); }
+.vs-side b { font-size: 30px; line-height: 1.1; }
+.vs-side.me b { color: var(--accent); }
+.vs-side small { font-size: 12px; color: var(--ink-2); }
+.vs-side .link { justify-self: start; font-size: 12.5px; }
+.compare-form { margin: 14px 0 4px; }
+.compare-form label { display: block; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--ink-2); font-weight: 600; margin-bottom: 6px; }
+.app.mobile .compare-form input { font-size: 16px; }

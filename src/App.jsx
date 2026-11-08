@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import maplibregl from 'maplibre-gl'
 import { buildGrid, cellPolygon } from './grid.js'
 import { featureFinder, distanceKm, outsideMask } from './geo.js'
-import { describe, loadTerrain } from './terrain.js'
+import { describe, loadTerrain, quickScore } from './terrain.js'
 import { SCORE_PARTS, rankText } from './score.js'
 import { shareImage, shareText } from './share.js'
 import { P } from './palette.js'
@@ -103,6 +103,8 @@ export default function App() {
   const [zoom, setZoom] = useState(4)
   const [picked, setPicked] = useState(null)
   const [query, setQuery] = useState('')
+  const [fromLink, setFromLink] = useState(null)       // parcel number someone shared with this visitor
+  const [rival, setRival] = useState(null)             // the other parcel in a comparison
   const [labels, setLabels] = useState(true)
   const mobile = useIsMobile()
   const [panelOpen, setPanelOpen] = useState(() => !isMobileNow())
@@ -230,7 +232,7 @@ export default function App() {
 
         loadTerrain()                                            // warm up the card's reference layers
         const hash = location.hash.match(/parcela=(\d+)/)
-        if (hash) goToNumber(Number(hash[1]))
+        if (hash) { goToNumber(Number(hash[1])); setFromLink(Number(hash[1])) }
       })
 
     const redraw = () => {
@@ -258,6 +260,22 @@ export default function App() {
   }, [labels])
 
   const random = () => meta && goToNumber(1 + Math.floor(Math.random() * meta.population))
+
+  // Comparisons: the other parcel's score is computed from the prepared layers only, on the spot
+  const summary = async (cell) => {
+    const s = await quickScore(cell)
+    return { ...s, province: lookups.current.province((cell.w + cell.e) / 2, (cell.n + cell.s) / 2)?.properties.name ?? '' }
+  }
+  const mine = async () => {                       // "give me mine": the shared parcel becomes the rival
+    if (picked?.cell) setRival(await summary(picked.cell))
+    random()
+  }
+  const compareWith = async (n) => {
+    const cell = lookups.current?.grid.cellByNumber(n)
+    if (!cell) return false
+    setRival(await summary(cell))
+    return true
+  }
   const search = (e) => {
     e.preventDefault()
     const n = Number(query.replace(/[^\d]/g, ''))
@@ -370,6 +388,7 @@ export default function App() {
 
       {picked && (!mobile || !panelOpen) && <Card key={picked.cell?.number ?? picked.kind} info={picked} meta={meta}
         onGo={goToNumber} lookups={lookups.current} mobile={mobile} onAnother={random}
+        fromLink={fromLink} rival={rival} onMine={mine} onCompare={compareWith}
         onClose={() => { setPicked(null); map.current.getSource('picked').setData(EMPTY) }} />}
     </div>
   )
@@ -377,7 +396,8 @@ export default function App() {
 
 // On phones the card is a bottom sheet: it opens half-way (the score and the buttons) and a tap on
 // the handle opens the full card. Its own footer keeps "Compartir" and "Otro terrenito" in reach
-function Card({ info, meta, onClose, onGo, lookups, mobile, onAnother }) {
+function Card({ info, meta, onClose, onGo, lookups, mobile, onAnother, fromLink, rival, onMine, onCompare }) {
+  const shared = info.kind === 'parcel' && info.cell.number === fromLink && !rival   // someone sent this one
   const [open, setOpen] = useState(false)
   const [shareAsk, setShareAsk] = useState(0)
   const oneTap = useRef(null)                                  // the phone's share sheet, once the image exists
@@ -396,7 +416,14 @@ function Card({ info, meta, onClose, onGo, lookups, mobile, onAnother }) {
         </button>
       )}
       <button className="close" onClick={onClose} aria-label="Cerrar">×</button>
+      {shared && (
+        <div className="invite">
+          <p>Alguien te compartió su terrenito. ¿Y a vos qué te toca?</p>
+          <button className="primary" onClick={onMine}>Dame el mío y comparemos</button>
+        </div>
+      )}
       {info.kind === 'parcel' && <Parcel info={info} meta={meta} onGo={onGo} lookups={lookups} shareAsk={shareAsk}
+        rival={rival} onCompare={onCompare} shared={shared}
         mobile={mobile} register={(fn) => { oneTap.current = fn }} />}
       {info.kind === 'held' && (
         <>
@@ -423,15 +450,16 @@ function Card({ info, meta, onClose, onGo, lookups, mobile, onAnother }) {
     </section>
     {mobile && (
       <div className="m-foot">
-        {canShare && <button className="primary" onClick={share}>Compartir</button>}
-        <button className={canShare ? '' : 'primary'} onClick={onAnother}>Otro terrenito</button>
+        {shared && <button className="primary" onClick={onMine}>Dame el mío</button>}
+        {canShare && !shared && <button className="primary" onClick={share}>Compartir</button>}
+        <button className={canShare || shared ? '' : 'primary'} onClick={onAnother}>Otro terrenito</button>
       </div>
     )}
     </>
   )
 }
 
-function Parcel({ info, meta, onGo, lookups, shareAsk, mobile, register }) {
+function Parcel({ info, meta, onGo, lookups, shareAsk, mobile, register, rival, onCompare, shared }) {
   const { cell, province, neighbours, terrain: t } = info
   const n = (x) => (x ? <button className="link" onClick={() => onGo(x)}>{fmt(x)}</button> : <span className="none">—</span>)
   const unclaimed = cell.number > meta.population
@@ -442,7 +470,7 @@ function Parcel({ info, meta, onGo, lookups, shareAsk, mobile, register }) {
   return (
     <>
       <p className="kicker">Parcela {fmt(cell.number)} de {fmt(meta.parcels)}</p>
-      <h2>{unclaimed ? 'Sin dueño' : 'Tu terrenito'}</h2>
+      <h2>{unclaimed ? 'Sin dueño' : shared ? 'El terrenito que te compartieron' : 'Tu terrenito'}</h2>
       <p className="sub">
         {unclaimed
           ? `Una de las ${fmt(meta.parcels - meta.population)} parcelas que sobran cuando todos ya tienen la suya.`
@@ -452,8 +480,14 @@ function Parcel({ info, meta, onGo, lookups, shareAsk, mobile, register }) {
       {!t && <p className="loading">Midiendo tu terrenito…</p>}
       {t === 'error' && <p className="loading">No pudimos leer los datos de este terreno. Probá de nuevo.</p>}
 
+      {t && t !== 'error' && rival && rival.number !== cell.number && (
+        <Versus mine={t} rival={rival} onGo={onGo} />
+      )}
+
       {t && t !== 'error' && <Terrain t={t} km={km} named={named}
         share={!unclaimed && <Share info={info} meta={meta} lookups={lookups} ask={shareAsk} auto={mobile} register={register} />} />}
+
+      {t && t !== 'error' && <CompareForm onCompare={onCompare} meta={meta} />}
 
       <div className="neighbours">
         <span>Parcelas vecinas</span>
@@ -466,6 +500,54 @@ function Parcel({ info, meta, onGo, lookups, shareAsk, mobile, register }) {
         </div>
       </div>
     </>
+  )
+}
+
+// Your parcel against the other person's: score, ranking and who wins
+function Versus({ mine, rival, onGo }) {
+  const diff = mine.score.total - rival.total
+  const verdict = diff > 0 ? `¡Ganaste por ${diff} ${diff === 1 ? 'punto' : 'puntos'}!`
+    : diff < 0 ? `Esta vez perdiste por ${-diff} ${diff === -1 ? 'punto' : 'puntos'}` : '¡Empate!'
+  return (
+    <div className="versus">
+      <p className="verdict-line">{verdict}</p>
+      <div className="vs-row">
+        <div className="vs-side me">
+          <span>Tu terrenito</span>
+          <b>{mine.score.total}</b>
+          <small>{mine.rank ? rankText(mine.rank) : ''}</small>
+        </div>
+        <i>vs</i>
+        <div className="vs-side">
+          <span>El de la otra persona</span>
+          <b>{rival.total}</b>
+          <small>{rival.town ? `cerca de ${rival.town}` : rival.province}</small>
+          <button className="link" onClick={() => onGo(rival.number)}>Ver parcela {fmt(rival.number)}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CompareForm({ onCompare, meta }) {
+  const [n, setN] = useState('')
+  const [msg, setMsg] = useState('')
+  const submit = async (e) => {
+    e.preventDefault()
+    const num = Number(n.replace(/[^\d]/g, ''))
+    const ok = num && (await onCompare(num))
+    setMsg(ok ? '' : `Poné un número entre 1 y ${fmt(meta.parcels)}`)
+  }
+  return (
+    <form className="compare-form" onSubmit={submit}>
+      <label htmlFor="cmp">Compará con alguien</label>
+      <div className="search">
+        <input id="cmp" inputMode="numeric" placeholder="Número de su parcela" value={n}
+          onChange={(e) => setN(e.target.value)} />
+        <button type="submit">Comparar</button>
+      </div>
+      {msg && <p className="fine">{msg}</p>}
+    </form>
   )
 }
 
