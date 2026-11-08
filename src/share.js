@@ -3,12 +3,13 @@
 // Drawn on a canvas from the same tiles and data the app uses.
 
 import { rankText } from './score.js'
+import { P, alpha } from './palette.js'
 
 const W = 1600, H = 900
 const MAP_W = 860
 const Z = 15                                    // ~240 m parcel is ~60 px wide here
 const C = {
-  bg: '#11161b', panel: '#151b21', ink: '#f4f1ea', ink2: '#a9a397', accent: '#ff8a3d',
+  bg: P.bg, panel: P.panel, ink: P.ink, ink2: P.ink2, accent: P.accent, accent2: P.accent2, accentInk: P.accentInk,
   line: 'rgba(255,255,255,0.12)',
 }
 const VERDICT = ['No', 'Difícil', 'Con esfuerzo', 'Sí']
@@ -91,8 +92,11 @@ async function drawMap(ctx, cell, grid, argentina) {
 
   // The parcel
   const [x0, y0] = toPx(cell.w, cell.n), [x1, y1] = toPx(cell.e, cell.s)
-  ctx.fillStyle = 'rgba(255,138,61,0.28)'
+  ctx.fillStyle = alpha(P.accent, 0.28)
   ctx.fillRect(x0, y0, x1 - x0, y1 - y0)
+  ctx.strokeStyle = alpha(P.bg, 0.75)            // dark halo, so a light accent reads on any ground
+  ctx.lineWidth = 9
+  ctx.strokeRect(x0, y0, x1 - x0, y1 - y0)
   ctx.strokeStyle = C.accent
   ctx.lineWidth = 4
   ctx.strokeRect(x0, y0, x1 - x0, y1 - y0)
@@ -107,7 +111,7 @@ async function drawMap(ctx, cell, grid, argentina) {
   ctx.beginPath()
   ctx.moveTo((x0 + x1) / 2 - 8, ly + 38); ctx.lineTo((x0 + x1) / 2 + 8, ly + 38); ctx.lineTo((x0 + x1) / 2, ly + 48)
   ctx.fill()
-  ctx.fillStyle = '#1a0e05'
+  ctx.fillStyle = C.accentInk
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(label, (x0 + x1) / 2, ly + 20)
@@ -116,7 +120,7 @@ async function drawMap(ctx, cell, grid, argentina) {
 
   // Fade into the text panel
   const g = ctx.createLinearGradient(MAP_W - 180, 0, MAP_W, 0)
-  g.addColorStop(0, 'rgba(21,27,33,0)')
+  g.addColorStop(0, alpha(P.panel, 0))
   g.addColorStop(1, C.panel)
   ctx.fillStyle = g
   ctx.fillRect(MAP_W - 180, 0, 180, H)
@@ -149,7 +153,7 @@ function drawLocator(ctx, argentina, lon, lat) {
   ctx.stroke()
   const [dx, dy] = px(lon, lat)
   ctx.beginPath(); ctx.arc(dx, dy, 11, 0, 2 * Math.PI)
-  ctx.fillStyle = 'rgba(255,138,61,0.35)'; ctx.fill()
+  ctx.fillStyle = alpha(P.accent, 0.35); ctx.fill()
   ctx.beginPath(); ctx.arc(dx, dy, 5, 0, 2 * Math.PI)
   ctx.fillStyle = C.accent; ctx.fill()
 }
@@ -180,7 +184,7 @@ function drawPanel(ctx, { cell, meta, province, t }) {
   // Score
   if (t.rank) {
     const big = rankText(t.rank)
-    ctx.fillStyle = C.accent
+    ctx.fillStyle = C.accent2
     ctx.font = font(fit(ctx, big, maxW, 104, 800, 56), 800)
     ctx.fillText(big, x - 4, 318)
     ctx.fillStyle = C.ink2
@@ -196,8 +200,8 @@ function drawPanel(ctx, { cell, meta, province, t }) {
     const w = ctx.measureText(text).width + 30
     if (bx + w > x + maxW) { bx = x; by += 50; if (by > 450) break }
     roundRect(ctx, bx, by, w, 40, 20)
-    ctx.fillStyle = 'rgba(255,138,61,0.14)'; ctx.fill()
-    ctx.strokeStyle = 'rgba(255,138,61,0.5)'; ctx.lineWidth = 1.5; ctx.stroke()
+    ctx.fillStyle = alpha(P.accent2, 0.14); ctx.fill()
+    ctx.strokeStyle = alpha(P.accent2, 0.5); ctx.lineWidth = 1.5; ctx.stroke()
     ctx.fillStyle = C.ink
     ctx.fillText(text, bx + 15, by + 27)
     bx += w + 10

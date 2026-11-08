@@ -5,6 +5,8 @@ import { featureFinder, distanceKm, outsideMask } from './geo.js'
 import { describe, loadTerrain } from './terrain.js'
 import { SCORE_PARTS, rankText } from './score.js'
 import { shareImage, shareText } from './share.js'
+import { P } from './palette.js'
+import Social from './Social.jsx'
 
 const DATA = './data/'
 const GRID_MIN_ZOOM = 12            // below this the parcels are a few pixels wide
@@ -46,7 +48,7 @@ const LABEL_LAYERS = [
     filter: ['all', ['==', ['get', 'kind'], 'lago'], ['>=', ['get', 'km2'], km2],
       ...(k > 0 ? [['<', ['get', 'km2'], all[k - 1][1]]] : [])],
     layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 12, 'text-max-width': 7 },
-    paint: { 'text-color': '#cfe3ff', ...halo },
+    paint: { 'text-color': P.natureLine, ...halo },
   })),
   ...[[0, 5, 13, 'Open Sans Semibold'], [1, 8, 12, 'Noto Sans Regular'], [2, 10.5, 11, 'Noto Sans Regular']]
     .map(([cls, minzoom, size, font]) => ({
@@ -124,7 +126,9 @@ export default function App() {
       history.replaceState(null, '', `#parcela=${info.cell.number}`)
       if (fly) {
         map.current.fitBounds([[info.cell.w, info.cell.s], [info.cell.e, info.cell.n]],
-          { padding: 120, maxZoom: 14.5, duration: 2500 })
+          { padding: window.innerWidth <= 720   // phones: keep it above the card
+            ? { top: 90, bottom: Math.round(window.innerHeight * 0.6) + 20, left: 40, right: 40 } : 120,
+          maxZoom: 14.5, duration: 2500 })
       }
     }
   }, [])
@@ -183,19 +187,20 @@ export default function App() {
         m.addSource('parcels', { type: 'geojson', data: EMPTY })
         m.addSource('picked', { type: 'geojson', data: EMPTY })
 
-        m.addLayer({ id: 'outside', type: 'fill', source: 'outside', paint: { 'fill-color': '#0b0f14', 'fill-opacity': 0.55 } })
-        m.addLayer({ id: 'nature-fill', type: 'fill', source: 'nature', paint: { 'fill-color': '#6aa8ff', 'fill-opacity': 0.3 } })
-        m.addLayer({ id: 'nature-line', type: 'line', source: 'nature', paint: { 'line-color': '#a9cbff', 'line-width': 0.8, 'line-opacity': 0.7 } })
-        m.addLayer({ id: 'held-fill', type: 'fill', source: 'held', paint: { 'fill-color': '#3fb8a5', 'fill-opacity': 0.28 } })
-        m.addLayer({ id: 'held-line', type: 'line', source: 'held', paint: { 'line-color': '#7fe0d0', 'line-width': 1, 'line-opacity': 0.8 } })
-        m.addLayer({ id: 'parks-fill', type: 'fill', source: 'parks', minzoom: 11, paint: { 'fill-color': '#3fb8a5', 'fill-opacity': 0.35 } })
+        m.addLayer({ id: 'outside', type: 'fill', source: 'outside', paint: { 'fill-color': P.bg, 'fill-opacity': 0.55 } })
+        m.addLayer({ id: 'nature-fill', type: 'fill', source: 'nature', paint: { 'fill-color': P.nature, 'fill-opacity': 0.3 } })
+        m.addLayer({ id: 'nature-line', type: 'line', source: 'nature', paint: { 'line-color': P.natureLine, 'line-width': 0.8, 'line-opacity': 0.7 } })
+        m.addLayer({ id: 'held-fill', type: 'fill', source: 'held', paint: { 'fill-color': P.held, 'fill-opacity': P.held === '#ffffff' ? 0.2 : 0.28 } })
+        m.addLayer({ id: 'held-line', type: 'line', source: 'held', paint: { 'line-color': P.heldLine, 'line-width': 1, 'line-opacity': 0.8 } })
+        m.addLayer({ id: 'parks-fill', type: 'fill', source: 'parks', minzoom: 11, paint: { 'fill-color': P.held, 'fill-opacity': P.held === '#ffffff' ? 0.25 : 0.35 } })
         m.addLayer({ id: 'country', type: 'line', source: 'country', paint: { 'line-color': '#ffffff', 'line-width': 1.2, 'line-opacity': 0.85 } })
         m.addLayer({
           id: 'parcels', type: 'line', source: 'parcels',
           paint: { 'line-color': '#ffffff', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0.35, 15, 0.7], 'line-width': 0.7 },
         })
-        m.addLayer({ id: 'picked-fill', type: 'fill', source: 'picked', paint: { 'fill-color': '#ff8a3d', 'fill-opacity': 0.25 } })
-        m.addLayer({ id: 'picked-line', type: 'line', source: 'picked', paint: { 'line-color': '#ff8a3d', 'line-width': 2.5 } })
+        m.addLayer({ id: 'picked-fill', type: 'fill', source: 'picked', paint: { 'fill-color': P.accent, 'fill-opacity': 0.25 } })
+        m.addLayer({ id: 'picked-halo', type: 'line', source: 'picked', paint: { 'line-color': P.bg, 'line-width': 6, 'line-opacity': 0.7 } })
+        m.addLayer({ id: 'picked-line', type: 'line', source: 'picked', paint: { 'line-color': P.accent, 'line-width': 3 } })
 
         // Province borders and place names go on top of everything
         m.addSource('provinces', { type: 'geojson', data: provinces })
@@ -317,7 +322,7 @@ export default function App() {
           </>
         )}
         {!meta && <p className="lead">Midiendo el país…</p>}
-        <p className="credit">Franco Guiragossian · <a href="https://dataviz.ar">dataviz.ar</a></p>
+        <Social />
       </aside>
 
       {meta && zoom < GRID_MIN_ZOOM && !picked && (
