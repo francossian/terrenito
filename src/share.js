@@ -101,9 +101,9 @@ async function drawMap(ctx, cell, grid, argentina) {
   ctx.lineWidth = 4
   ctx.strokeRect(x0, y0, x1 - x0, y1 - y0)
 
-  // "Tu terreno" tag above it
+  // "Tu terrenito" tag above it
   ctx.font = font(20, 700)
-  const label = 'Tu terreno', lw = ctx.measureText(label).width + 28
+  const label = 'Tu terrenito', lw = ctx.measureText(label).width + 28
   const lx = (x0 + x1) / 2 - lw / 2, ly = y0 - 58
   roundRect(ctx, lx, ly, lw, 38, 19)
   ctx.fillStyle = C.accent
@@ -168,7 +168,7 @@ function drawPanel(ctx, { cell, meta, province, t }) {
   ctx.fillStyle = C.accent
   ctx.font = font(17, 700)
   ctx.letterSpacing = '3px'
-  ctx.fillText('ARGENTINA, REPARTIDA', x, 92)
+  ctx.fillText('TU TERRENITO EN ARGENTINA', x, 92)
   ctx.letterSpacing = '0px'
 
   const place = t.town ? `Cerca de ${t.town.name}` : province

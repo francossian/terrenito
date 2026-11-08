@@ -183,3 +183,53 @@ dl.near dd { display: flex; gap: 8px; justify-content: space-between; }
   .maplibregl-ctrl-bottom-right .maplibregl-ctrl-group { display: none; }   /* pinch to zoom on phones */
   .card { bottom: 40px; max-height: calc(60% - 30px); }
 }
+
+/* ==== Phones: top bar, thumb-reach button, bottom sheet ============================= */
+.app.mobile .panel:not(.sheet) { display: none; }
+.app.mobile .panel.sheet {
+  inset: 0; width: auto; max-height: none; border-radius: 0; z-index: 30;
+  padding: calc(18px + env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+  background: var(--panel-solid, var(--panel)); backdrop-filter: none;
+}
+.app.mobile .panel.sheet .toggle { width: 36px; height: 36px; font-size: 22px; top: calc(12px + env(safe-area-inset-top)); right: 14px; }
+
+.m-top {
+  position: absolute; z-index: 10; top: calc(10px + env(safe-area-inset-top)); left: 10px; right: 10px;
+  display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: 14px;
+  background: var(--panel); backdrop-filter: blur(8px); border: 1px solid var(--line);
+}
+.m-top div { flex: 1; min-width: 0; }
+.m-top h1 { margin: 0; font-size: 19px; }
+.m-top p { margin: 1px 0 0; font-size: 13px; color: var(--ink-2); }
+.m-info { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.06); color: var(--ink); font: 600 17px Inter, sans-serif; cursor: pointer; }
+
+.m-bottom {
+  position: absolute; z-index: 10; left: 10px; right: 10px; bottom: calc(34px + env(safe-area-inset-bottom));
+  padding: 12px; border-radius: 18px; display: grid; gap: 10px;
+  background: var(--panel); backdrop-filter: blur(8px); border: 1px solid var(--line);
+}
+.primary.big { padding: 16px; font-size: 18px; font-weight: 700; border-radius: 12px; min-height: 56px; }
+.m-bottom .search input, .m-bottom .search button { min-height: 44px; font-size: 16px; }   /* 16px: no zoom on iOS */
+
+.app.mobile .card.sheet {
+  top: auto; left: 0; right: 0; bottom: 0; width: auto; border-radius: 20px 20px 0 0;
+  padding: 6px 18px calc(84px + env(safe-area-inset-bottom)); border-bottom: 0;
+  transition: max-height 0.3s ease; overscroll-behavior: contain;
+}
+.app.mobile .card.sheet.peek { max-height: 48vh; overflow: hidden; }
+.app.mobile .card.sheet.open { max-height: 88vh; overflow-y: auto; }
+.app.mobile .card .close { top: 10px; right: 12px; font-size: 26px; width: 40px; height: 40px; }
+.handle { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; padding: 6px 0 10px;
+  border: 0; background: none; color: var(--ink-2); font: 12px Inter, sans-serif; cursor: pointer; }
+.handle span { width: 42px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.3); }
+
+.m-foot {
+  position: absolute; z-index: 20; left: 0; right: 0; bottom: 0; display: flex; gap: 8px;
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: var(--panel-solid, #0F1B2D); border-top: 1px solid var(--line);
+}
+.m-foot button { flex: 1; min-height: 50px; border-radius: 12px; font: 600 16px Inter, sans-serif; cursor: pointer;
+  border: 1px solid var(--line); background: rgba(255, 255, 255, 0.08); color: var(--ink); }
+.m-foot .primary { border: 0; background: var(--accent); color: var(--accentInk); }
+.app.mobile .maplibregl-ctrl-bottom-left { bottom: env(safe-area-inset-bottom); }

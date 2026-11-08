@@ -81,6 +81,20 @@ const WHY = {
   'Plaza o parque urbano': 'Es un espacio público de la ciudad y sigue siendo de todos.',
 }
 
+// Phones get their own layout: a top bar, a big button in thumb reach, a bottom sheet for the card
+const MOBILE_Q = '(max-width: 720px)'
+const isMobileNow = () => window.matchMedia(MOBILE_Q).matches
+function useIsMobile() {
+  const [mobile, setMobile] = useState(isMobileNow)
+  useEffect(() => {
+    const q = window.matchMedia(MOBILE_Q)
+    const on = () => setMobile(q.matches)
+    q.addEventListener('change', on)
+    return () => q.removeEventListener('change', on)
+  }, [])
+  return mobile
+}
+
 export default function App() {
   const mapDiv = useRef(null)
   const map = useRef(null)
@@ -90,7 +104,8 @@ export default function App() {
   const [picked, setPicked] = useState(null)
   const [query, setQuery] = useState('')
   const [labels, setLabels] = useState(true)
-  const [panelOpen, setPanelOpen] = useState(() => window.innerWidth > 720)
+  const mobile = useIsMobile()
+  const [panelOpen, setPanelOpen] = useState(() => !isMobileNow())
 
   // ---- Selecting a place: a parcel, held land, or outside Argentina --------------
   const select = useCallback((lon, lat, { fly = false } = {}) => {
@@ -120,14 +135,14 @@ export default function App() {
         .then((terrain) => setPicked((p) => (p?.cell?.number === info.cell.number ? { ...p, terrain } : p)))
         .catch(() => setPicked((p) => (p?.cell?.number === info.cell.number ? { ...p, terrain: 'error' } : p)))
     }
-    if (window.innerWidth <= 720) setPanelOpen(false)            // phones: the card replaces the panel
+    if (isMobileNow()) setPanelOpen(false)                       // phones: the card replaces the panel
     map.current.getSource('picked').setData(info.kind === 'parcel' ? cellPolygon(info.cell) : EMPTY)
     if (info.kind === 'parcel') {
       history.replaceState(null, '', `#parcela=${info.cell.number}`)
       if (fly) {
         map.current.fitBounds([[info.cell.w, info.cell.s], [info.cell.e, info.cell.n]],
-          { padding: window.innerWidth <= 720   // phones: keep it above the card
-            ? { top: 90, bottom: Math.round(window.innerHeight * 0.6) + 20, left: 40, right: 40 } : 120,
+          { padding: isMobileNow()   // phones: keep it above the bottom sheet
+            ? { top: 90, bottom: Math.round(window.innerHeight * 0.5), left: 40, right: 40 } : 120,
           maxZoom: 14.5, duration: 2500 })
       }
     }
@@ -144,7 +159,8 @@ export default function App() {
       container: mapDiv.current,
       style,
       bounds: [[-74, -55.2], [-53.5, -21.7]],   // the Malvinas fit in this box too
-      fitBoundsOptions: { padding: { top: 40, bottom: 40, left: window.innerWidth > 720 ? 380 : 40, right: 40 } },
+      fitBoundsOptions: { padding: isMobileNow() ? { top: 90, bottom: 170, left: 20, right: 20 }
+        : { top: 40, bottom: 40, left: 380, right: 40 } },
       maxZoom: 16.5,
       attributionControl: { compact: true },
       locale: { 'NavigationControl.ZoomIn': 'Acercar', 'NavigationControl.ZoomOut': 'Alejar' },
@@ -252,15 +268,38 @@ export default function App() {
   const heldPct = meta ? 100 * (1 - meta.shared_km2 / meta.country_km2) : 0
 
   return (
-    <div className="app">
+    <div className={`app ${mobile ? 'mobile' : ''}`}>
       <div ref={mapDiv} className="map" />
 
-      <aside className={`panel ${panelOpen ? '' : 'closed'}`}>
-        <button className="toggle" onClick={() => setPanelOpen(!panelOpen)} aria-label="Mostrar u ocultar el panel">
-          {panelOpen ? '–' : 'i'}
+      {mobile && !panelOpen && (
+        <header className="m-top">
+          <div>
+            <h1>Tu terrenito</h1>
+            <p>{meta ? `${fmt(ha, 1)} ha para cada argentino. ¿Dónde te toca?` : 'Midiendo el país…'}</p>
+          </div>
+          <button className="m-info" onClick={() => setPanelOpen(true)} aria-label="Cómo funciona">i</button>
+        </header>
+      )}
+
+      {mobile && !panelOpen && !picked && meta && (
+        <div className="m-bottom">
+          <button className="primary big" onClick={random}>Dame mi terrenito</button>
+          <form onSubmit={search} className="search">
+            <input inputMode="numeric" placeholder="¿Ya tenés número? Buscalo"
+              value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Número de parcela" />
+            <button type="submit">Ir</button>
+          </form>
+        </div>
+      )}
+
+      <aside className={`panel ${panelOpen ? '' : 'closed'} ${mobile && panelOpen ? 'sheet' : ''}`}
+        hidden={mobile && !panelOpen}>
+        <button className="toggle" onClick={() => setPanelOpen(!panelOpen)}
+          aria-label={panelOpen ? 'Cerrar' : 'Mostrar el panel'}>
+          {panelOpen ? (mobile ? '×' : '–') : 'i'}
         </button>
         <p className="kicker">#30DayMapChallenge · Día 8 · Utopía</p>
-        <h1>Argentina, repartida</h1>
+        <h1>Tu terrenito en Argentina</h1>
         {meta && (
           <>
             <p className="lead">
@@ -272,7 +311,7 @@ export default function App() {
               casi la mitad.<sup>*</sup>
             </p>
             <div className="actions">
-              <button className="primary" onClick={random}>Dame mi terreno</button>
+              <button className="primary" onClick={() => { random(); if (mobile) setPanelOpen(false) }}>Dame mi terrenito</button>
               <form onSubmit={search} className="search">
                 <input inputMode="numeric" placeholder={`Parcela 1 a ${fmt(meta.parcels)}`}
                   value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Número de parcela" />
@@ -325,21 +364,40 @@ export default function App() {
         <Social />
       </aside>
 
-      {meta && zoom < GRID_MIN_ZOOM && !picked && (
+      {meta && !mobile && zoom < GRID_MIN_ZOOM && !picked && (
         <div className="hint">Acercate para ver las parcelas</div>
       )}
 
-      {picked && <Card info={picked} meta={meta} onGo={goToNumber} lookups={lookups.current}
+      {picked && (!mobile || !panelOpen) && <Card key={picked.cell?.number ?? picked.kind} info={picked} meta={meta}
+        onGo={goToNumber} lookups={lookups.current} mobile={mobile} onAnother={random}
         onClose={() => { setPicked(null); map.current.getSource('picked').setData(EMPTY) }} />}
     </div>
   )
 }
 
-function Card({ info, meta, onClose, onGo, lookups }) {
+// On phones the card is a bottom sheet: it opens half-way (the score and the buttons) and a tap on
+// the handle opens the full card. Its own footer keeps "Compartir" and "Otro terrenito" in reach
+function Card({ info, meta, onClose, onGo, lookups, mobile, onAnother }) {
+  const [open, setOpen] = useState(false)
+  const [shareAsk, setShareAsk] = useState(0)
+  const oneTap = useRef(null)                                  // the phone's share sheet, once the image exists
+  const canShare = info.kind === 'parcel' && info.terrain && info.terrain !== 'error' && info.cell.number <= meta.population
+  const share = () => {
+    if (oneTap.current) return oneTap.current()
+    setOpen(true); setShareAsk((k) => k + 1)                   // no share sheet: show the image and its buttons
+  }
+
   return (
-    <section className="card">
+    <>
+    <section className={`card ${mobile ? `sheet ${open ? 'open' : 'peek'}` : ''}`}>
+      {mobile && (
+        <button className="handle" onClick={() => setOpen(!open)} aria-label={open ? 'Achicar la ficha' : 'Ver la ficha completa'}>
+          <span />{open ? 'Achicar' : 'Ver ficha completa'}
+        </button>
+      )}
       <button className="close" onClick={onClose} aria-label="Cerrar">×</button>
-      {info.kind === 'parcel' && <Parcel info={info} meta={meta} onGo={onGo} lookups={lookups} />}
+      {info.kind === 'parcel' && <Parcel info={info} meta={meta} onGo={onGo} lookups={lookups} shareAsk={shareAsk}
+        mobile={mobile} register={(fn) => { oneTap.current = fn }} />}
       {info.kind === 'held' && (
         <>
           <p className="kicker">No se reparte</p>
@@ -363,10 +421,17 @@ function Card({ info, meta, onClose, onGo, lookups }) {
         </>
       )}
     </section>
+    {mobile && (
+      <div className="m-foot">
+        {canShare && <button className="primary" onClick={share}>Compartir</button>}
+        <button className={canShare ? '' : 'primary'} onClick={onAnother}>Otro terrenito</button>
+      </div>
+    )}
+    </>
   )
 }
 
-function Parcel({ info, meta, onGo, lookups }) {
+function Parcel({ info, meta, onGo, lookups, shareAsk, mobile, register }) {
   const { cell, province, neighbours, terrain: t } = info
   const n = (x) => (x ? <button className="link" onClick={() => onGo(x)}>{fmt(x)}</button> : <span className="none">—</span>)
   const unclaimed = cell.number > meta.population
@@ -377,25 +442,25 @@ function Parcel({ info, meta, onGo, lookups }) {
   return (
     <>
       <p className="kicker">Parcela {fmt(cell.number)} de {fmt(meta.parcels)}</p>
-      <h2>{unclaimed ? 'Sin dueño' : 'Tu terreno'}</h2>
+      <h2>{unclaimed ? 'Sin dueño' : 'Tu terrenito'}</h2>
       <p className="sub">
         {unclaimed
           ? `Una de las ${fmt(meta.parcels - meta.population)} parcelas que sobran cuando todos ya tienen la suya.`
           : `${fmt(meta.area_m2 / 1e4, 1)} ha ${town ? `cerca de ${town}, ` : 'en '}${province}`}
       </p>
 
-      {!t && <p className="loading">Midiendo tu terreno…</p>}
+      {!t && <p className="loading">Midiendo tu terrenito…</p>}
       {t === 'error' && <p className="loading">No pudimos leer los datos de este terreno. Probá de nuevo.</p>}
 
       {t && t !== 'error' && <Terrain t={t} km={km} named={named}
-        share={!unclaimed && <Share info={info} meta={meta} lookups={lookups} />} />}
+        share={!unclaimed && <Share info={info} meta={meta} lookups={lookups} ask={shareAsk} auto={mobile} register={register} />} />}
 
       <div className="neighbours">
         <span>Parcelas vecinas</span>
         <div className="compass">
           <div className="n">{n(neighbours.north)}</div>
           <div className="w">{n(neighbours.west)}</div>
-          <div className="me">Esta</div>
+          <div className="me">Tu terrenito</div>
           <div className="e">{n(neighbours.east)}</div>
           <div className="s">{n(neighbours.south)}</div>
         </div>
@@ -414,9 +479,12 @@ const COVER = [
 const VERDICT = ['No', 'Difícil', 'Con esfuerzo', 'Sí']
 
 // Share: builds the image once, then offers the phone's share sheet, WhatsApp, download and copy
-function Share({ info, meta, lookups }) {
+// auto: build the image as soon as the card opens (phones), so "Compartir" in the footer can open the
+// share sheet right away; register: hands the footer that one-tap share, once it exists
+function Share({ info, meta, lookups, ask = 0, auto = false, register }) {
   const [state, setState] = useState(null)          // null | 'making' | { url, blob, text, link }
   const [note, setNote] = useState('')
+  const box = useRef(null)
 
   const make = async () => {
     setState('making')
@@ -425,17 +493,27 @@ function Share({ info, meta, lookups }) {
     setState({ url: URL.createObjectURL(blob), blob, text, link })
   }
   useEffect(() => () => { if (state?.url) URL.revokeObjectURL(state.url) }, [state])
+  useEffect(() => { if (auto) make() }, [])                                       // eslint-disable-line
+  useEffect(() => {
+    if (!ask) return
+    if (!state) make()
+    setTimeout(() => box.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350)
+  }, [ask])                                                                      // eslint-disable-line
+
+  const file = state?.blob && new File([state.blob], `mi-terrenito-${info.cell.number}.png`, { type: 'image/png' })
+  const canShareFile = file && navigator.canShare?.({ files: [file] })
+  useEffect(() => {
+    register?.(canShareFile ? () => navigator.share({ files: [file], text: state.text }).catch(() => {}) : null)
+  }, [state])                                                                    // eslint-disable-line
 
   if (!state || state === 'making') {
     return (
-      <button className="primary share-btn" onClick={make} disabled={state === 'making'}>
-        {state === 'making' ? 'Armando tu imagen…' : 'Compartir mi terreno'}
+      <button ref={box} className="primary share-btn" onClick={make} disabled={state === 'making'}>
+        {state === 'making' ? 'Armando tu imagen…' : 'Compartir mi terrenito'}
       </button>
     )
   }
 
-  const file = new File([state.blob], `mi-terreno-${info.cell.number}.png`, { type: 'image/png' })
-  const canShareFile = navigator.canShare?.({ files: [file] })
   const flash = (msg) => { setNote(msg); setTimeout(() => setNote(''), 2500) }
   const native = () => navigator.share({ files: [file], text: state.text }).catch(() => {})
   const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(state.text)}`, '_blank', 'noopener')
@@ -445,8 +523,8 @@ function Share({ info, meta, lookups }) {
   const copyLink = () => navigator.clipboard.writeText(state.link).then(() => flash('Link copiado'))
 
   return (
-    <div className="share">
-      <img src={state.url} alt="Imagen para compartir con tu terreno" />
+    <div className="share" ref={box}>
+      <img src={state.url} alt="Imagen para compartir con tu terrenito" />
       <div className="share-actions">
         {canShareFile && <button className="primary" onClick={native}>Compartir</button>}
         <button onClick={whatsapp}>WhatsApp</button>
